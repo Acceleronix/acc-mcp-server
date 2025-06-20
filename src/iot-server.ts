@@ -27,7 +27,18 @@ export class IoTMCP extends McpAgent {
   });
 
   async init() {
-    const env = this.state as unknown as IoTEnvironment;
+    // Get environment variables from the Durable Object's env
+    const env = this.env as unknown as IoTEnvironment;
+    
+    // Validate that environment variables are available
+    if (!env.BASE_URL || !env.ACCESS_KEY || !env.ACCESS_SECRET) {
+      console.error('Missing required environment variables:', {
+        BASE_URL: !!env.BASE_URL,
+        ACCESS_KEY: !!env.ACCESS_KEY,
+        ACCESS_SECRET: !!env.ACCESS_SECRET
+      });
+      throw new Error('Missing required IoT API environment variables');
+    }
 
     // List products tool
     this.server.tool(
@@ -547,10 +558,31 @@ Data Source Description:
       {},
       async () => {
         try {
+          // Debug environment variables
+          const envDebug = {
+            BASE_URL: env.BASE_URL ? `${env.BASE_URL.substring(0, 20)}...` : 'MISSING',
+            ACCESS_KEY: env.ACCESS_KEY ? `${env.ACCESS_KEY.substring(0, 8)}...` : 'MISSING',
+            ACCESS_SECRET: env.ACCESS_SECRET ? '***PRESENT***' : 'MISSING'
+          };
+          
+          console.log('Health check - Environment variables:', envDebug);
+          
+          if (!env.BASE_URL || !env.ACCESS_KEY || !env.ACCESS_SECRET) {
+            return {
+              content: [{ 
+                type: "text", 
+                text: `IoT MCP Server configuration error. Environment variables status: ${JSON.stringify(envDebug)}` 
+              }]
+            };
+          }
+          
           const token = await getAccessToken(env);
           if (token) {
             return {
-              content: [{ type: "text", text: "IoT MCP Server is healthy and ready to serve requests" }]
+              content: [{ 
+                type: "text", 
+                text: `IoT MCP Server is healthy and ready to serve requests. Connected to: ${env.BASE_URL}` 
+              }]
             };
           } else {
             return {
@@ -558,8 +590,16 @@ Data Source Description:
             };
           }
         } catch (error) {
+          const envStatus = {
+            BASE_URL: !!env?.BASE_URL,
+            ACCESS_KEY: !!env?.ACCESS_KEY,
+            ACCESS_SECRET: !!env?.ACCESS_SECRET
+          };
           return {
-            content: [{ type: "text", text: `IoT MCP Server health check failed: ${error instanceof Error ? error.message : String(error)}` }]
+            content: [{ 
+              type: "text", 
+              text: `IoT MCP Server health check failed: ${error instanceof Error ? error.message : String(error)}. Env status: ${JSON.stringify(envStatus)}` 
+            }]
           };
         }
       }
