@@ -29,7 +29,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "OAUTH_KV",
-			"id": "0df2ded2bdfe4a928f1e5017738aca08"
+			"id": "9b80005b78a241c9a4f16de3989abce5"
 		}
 	],
 	"observability": {
