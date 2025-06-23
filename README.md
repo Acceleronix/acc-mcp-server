@@ -143,11 +143,11 @@ Once connected, you can ask Claude to:
 Claude will use the appropriate MCP tools to interact with your Acceleronix IoT platform.
 
 <div align="center">
-  <img src="img/available-tools.png" alt="Clicking on the hammer icon shows a list of available tools" width="600"/>
+  <img src="img/available_mcp_tools.png" alt="Clicking on the hammer icon shows a list of available tools" width="500"/>
 </div>
 
 <div align="center">
-  <img src="img/claude-does-math-the-fancy-way.png" alt="Claude answers the prompt using MCP tools" width="600"/>
+  <img src="img/how_many_products.png" alt="Claude answers the prompt using MCP tools" width="500"/>
 </div>
 
 ## Deploy to Cloudflare
