@@ -1,0 +1,40 @@
+name = "acc-mcp-server"
+main = "src/index.ts"
+compatibility_date = "2025-06-20"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+BASE_URL = "https://iot-api.acceleronix.io"
+# ACCESS_KEY and ACCESS_SECRET should be configured as environment variables in Cloudflare Workers dashboard
+# Do not put sensitive credentials in this file
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "9b80005b78a241c9a4f16de3989abce5"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "IoTMCP"
+
+# Assets
+[assets]
+directory = "./static/"
+binding = "ASSETS"
+
+# Observability
+[observability]
+enabled = true
+
+# Migrations
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MyMCP"]
+
+[[migrations]]
+tag = "v2"
+renamed_classes = [
+  { from = "MyMCP", to = "IoTMCP" }
+]
