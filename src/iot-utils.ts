@@ -476,3 +476,241 @@ export function formatAuthMode(authModeCode: number): string {
     default: return `Unknown (${authModeCode})`;
   }
 }
+
+export async function readDeviceData(
+  env: IoTEnvironment,
+  productKey: string,
+  deviceKey: string,
+  properties: string[],
+  options: {
+    cacheTime?: number;
+    isCache?: boolean;
+    isCover?: boolean;
+    qos?: number;
+    language?: string;
+  } = {}
+): Promise<any> {
+  const url = `${env.BASE_URL}/v2/deviceshadow/r3/openapi/dm/readData`;
+  
+  const {
+    cacheTime = 600,
+    isCache = false,
+    isCover = false,
+    qos = 1,
+    language = 'CN'
+  } = options;
+  
+  const requestBody = {
+    cacheTime,
+    data: JSON.stringify(properties),
+    devices: [deviceKey],
+    isCache,
+    isCover,
+    productKey,
+    qos
+  };
+  
+  const params = new URLSearchParams({ language });
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(`${url}?${params}`, {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    
+    if (content.code !== 200) {
+      throw new Error(content.msg || 'Unknown error');
+    }
+    
+    return content.data || [];
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to read device data');
+  }
+}
+
+export async function queryDeviceDataHistory(
+  env: IoTEnvironment,
+  productKey: string,
+  deviceKey: string,
+  options: {
+    deviceId?: number;
+    beginDateTimp?: number;
+    endDateTimp?: number;
+    direction?: number;
+    language?: string;
+    pageNum?: number;
+    pageSize?: number;
+    sendStatus?: number;
+  } = {}
+): Promise<any> {
+  const url = `${env.BASE_URL}/v2/quecdatastorage/r1/openapi/device/data/history`;
+  
+  const {
+    deviceId,
+    beginDateTimp,
+    endDateTimp,
+    direction,
+    language = 'CN',
+    pageNum = 1,
+    pageSize = 10,
+    sendStatus
+  } = options;
+  
+  const params = new URLSearchParams({
+    productKey,
+    deviceKey,
+    language,
+    pageNum: pageNum.toString(),
+    pageSize: pageSize.toString()
+  });
+  
+  if (deviceId !== undefined) {
+    params.append('deviceId', deviceId.toString());
+  }
+  if (beginDateTimp !== undefined) {
+    params.append('beginDateTimp', beginDateTimp.toString());
+  }
+  if (endDateTimp !== undefined) {
+    params.append('endDateTimp', endDateTimp.toString());
+  }
+  if (direction !== undefined) {
+    params.append('direction', direction.toString());
+  }
+  if (sendStatus !== undefined) {
+    params.append('sendStatus', sendStatus.toString());
+  }
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(`${url}?${params}`, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": token
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    
+    // Handle different code formats as seen in Python implementation
+    const apiCode = content.code;
+    if (typeof apiCode === 'object' && Object.keys(apiCode).length === 0) {
+      // Empty object code, assume success if data exists
+      if (!content.data) {
+        throw new Error(content.msg || 'Unknown API error with empty code object');
+      }
+    } else if (typeof apiCode === 'number' && apiCode !== 200) {
+      throw new Error(content.msg || 'Unknown error');
+    } else if (typeof apiCode !== 'number' && !(typeof apiCode === 'object' && Object.keys(apiCode).length === 0)) {
+      // Unexpected code format
+      if (!content.data) {
+        throw new Error(`API response has unexpected code format: ${apiCode}`);
+      }
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to query device data history');
+  }
+}
+
+export async function queryDeviceEventHistory(
+  env: IoTEnvironment,
+  productKey: string,
+  deviceKey: string,
+  options: {
+    deviceId?: number;
+    beginDateTimp?: number;
+    endDateTimp?: number;
+    eventType?: string;
+    language?: string;
+    pageNum?: number;
+    pageSize?: number;
+  } = {}
+): Promise<any> {
+  const url = `${env.BASE_URL}/v2/quecdatastorage/r1/openapi/device/eventdata/history`;
+  
+  const {
+    deviceId,
+    beginDateTimp,
+    endDateTimp,
+    eventType,
+    language = 'CN',
+    pageNum = 1,
+    pageSize = 10
+  } = options;
+  
+  const params = new URLSearchParams({
+    productKey,
+    deviceKey,
+    language,
+    pageNum: pageNum.toString(),
+    pageSize: pageSize.toString()
+  });
+  
+  if (deviceId !== undefined) {
+    params.append('deviceId', deviceId.toString());
+  }
+  if (beginDateTimp !== undefined) {
+    params.append('beginDateTimp', beginDateTimp.toString());
+  }
+  if (endDateTimp !== undefined) {
+    params.append('endDateTimp', endDateTimp.toString());
+  }
+  if (eventType !== undefined) {
+    params.append('eventType', eventType);
+  }
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(`${url}?${params}`, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": token
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    
+    // Handle different code formats as seen in Python implementation
+    const apiCode = content.code;
+    if (typeof apiCode === 'object' && Object.keys(apiCode).length === 0) {
+      // Empty object code, assume success if data exists
+      if (!content.data) {
+        throw new Error(content.msg || 'Unknown API error with empty code object');
+      }
+    } else if (typeof apiCode === 'number' && apiCode !== 200) {
+      throw new Error(content.msg || 'Unknown error');
+    } else if (typeof apiCode !== 'number' && !(typeof apiCode === 'object' && Object.keys(apiCode).length === 0)) {
+      // Unexpected code format
+      if (!content.data) {
+        throw new Error(`API response has unexpected code format: ${apiCode}`);
+      }
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to query device event history');
+  }
+}

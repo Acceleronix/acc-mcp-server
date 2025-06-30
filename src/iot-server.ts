@@ -12,6 +12,9 @@ import {
   powerSwitch,
   queryDeviceLocation,
   queryDeviceResources,
+  readDeviceData,
+  queryDeviceDataHistory,
+  queryDeviceEventHistory,
   formatTimestampWithTimezone,
   formatAccessType,
   formatNetworkWay,
@@ -543,6 +546,329 @@ Data Source Description:
 
           return {
             content: [{ type: "text", text: formattedOutput.join('\n') }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // Read device shadow data tool
+    this.server.tool(
+      "read_device_shadow_data",
+      {
+        product_key: z.string().describe("Product key"),
+        device_key: z.string().describe("Device key"),
+        properties: z.array(z.string()).describe("Array of property keys to read"),
+        cache_time: z.number().optional().default(600).describe("Cache time in seconds (default: 600)"),
+        is_cache: z.boolean().optional().default(false).describe("Whether to enable caching (default: false)"),
+        is_cover: z.boolean().optional().default(false).describe("Whether to overwrite previously sent data (default: false)"),
+        qos: z.number().optional().default(1).describe("QoS level setting (default: 1)"),
+        language: z.string().optional().default('CN').describe("Language setting CN/EN (default: CN)")
+      },
+      async ({ product_key, device_key, properties, cache_time, is_cache, is_cover, qos, language }) => {
+        try {
+          const result = await readDeviceData(env, product_key, device_key, properties, {
+            cacheTime: cache_time,
+            isCache: is_cache,
+            isCover: is_cover,
+            qos,
+            language
+          });
+          
+          if (!result || result.length === 0) {
+            return {
+              content: [{ type: "text", text: "No data returned from device shadow read request." }]
+            };
+          }
+
+          const formattedOutput = [
+            `Device Shadow Data Read Result:`,
+            "=" .repeat(40),
+            `Product Key: ${product_key}`,
+            `Device Key: ${device_key}`,
+            `Properties Requested: ${JSON.stringify(properties)}`,
+            "",
+            "Response Data:"
+          ];
+          
+          result.forEach((item: any, index: number) => {
+            formattedOutput.push(`${index + 1}. Device Response:`);
+            formattedOutput.push(`   Code: ${item.code}`);
+            formattedOutput.push(`   Product Key: ${item.productKey}`);
+            formattedOutput.push(`   Device Key: ${item.deviceKey}`);
+            formattedOutput.push(`   Ticket: ${item.ticket || 'N/A'}`);
+            formattedOutput.push(`   Message: ${item.message || 'N/A'}`);
+            formattedOutput.push(`   Raw Data: ${JSON.stringify(item)}`);
+          });
+
+          return {
+            content: [{ type: "text", text: formattedOutput.join('\n') }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // Read device properties tool (simplified version)
+    this.server.tool(
+      "read_device_properties",
+      {
+        product_key: z.string().describe("Product key"),
+        device_key: z.string().describe("Device key"),
+        properties: z.array(z.string()).optional().describe("Array of property keys to read (if not provided, will try to read all available properties)")
+      },
+      async ({ product_key, device_key, properties }) => {
+        try {
+          let propertiesToRead = properties;
+          
+          // If no properties specified, try to get from TSL definition
+          if (!propertiesToRead || propertiesToRead.length === 0) {
+            try {
+              const tslDefinition = await getProductTslJson(env, product_key);
+              if (tslDefinition && tslDefinition.properties) {
+                propertiesToRead = tslDefinition.properties.map((prop: any) => prop.code || prop.name).filter(Boolean);
+              }
+            } catch (tslError) {
+              console.warn('Failed to get TSL definition, using empty properties array:', tslError);
+              propertiesToRead = [];
+            }
+          }
+          
+          if (!propertiesToRead || propertiesToRead.length === 0) {
+            return {
+              content: [{ 
+                type: "text", 
+                text: "No properties specified and unable to auto-detect from TSL definition. Please specify properties to read." 
+              }]
+            };
+          }
+          
+          const result = await readDeviceData(env, product_key, device_key, propertiesToRead, {
+            isCache: false,
+            isCover: false,
+            qos: 1
+          });
+          
+          const formattedOutput = [
+            `Device Properties Read:`,
+            "=" .repeat(30),
+            `Device: ${device_key}`,
+            `Properties: ${propertiesToRead.join(', ')}`,
+            "",
+            "Result:",
+            JSON.stringify(result, null, 2)
+          ];
+
+          return {
+            content: [{ type: "text", text: formattedOutput.join('\n') }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // Query device data history tool
+    this.server.tool(
+      "get_device_data_history",
+      {
+        product_key: z.string().describe("Product key"),
+        device_key: z.string().describe("Device key"),
+        device_id: z.number().optional().describe("Device ID (optional, takes precedence over productKey/deviceKey)"),
+        begin_date_timp: z.number().optional().describe("Start time (timestamp in milliseconds, optional)"),
+        end_date_timp: z.number().optional().describe("End time (timestamp in milliseconds, optional)"),
+        direction: z.number().optional().describe("Data type: 1 - UP (uplink), 2 - DOWN (downlink) (optional)"),
+        language: z.string().optional().default('CN').describe("Language: CN/EN (default: CN)"),
+        page_num: z.number().optional().default(1).describe("Page number (default: 1)"),
+        page_size: z.number().optional().default(10).describe("Page size (default: 10)"),
+        send_status: z.number().optional().describe("Send status: 0 - Not sent; 1 - Sent; -1 - Send failed (optional)")
+      },
+      async ({ product_key, device_key, device_id, begin_date_timp, end_date_timp, direction, language, page_num, page_size, send_status }) => {
+        try {
+          const historyData = await queryDeviceDataHistory(env, product_key, device_key, {
+            deviceId: device_id,
+            beginDateTimp: begin_date_timp,
+            endDateTimp: end_date_timp,
+            direction,
+            language,
+            pageNum: page_num,
+            pageSize: page_size,
+            sendStatus: send_status
+          });
+          
+          if (!historyData || typeof historyData !== 'object') {
+            return {
+              content: [{ type: "text", text: `Error: Unexpected response format from API: ${String(historyData)}` }]
+            };
+          }
+
+          const dataEntries = historyData.data || [];
+          
+          // Handle pagination info - support both direct values and object format
+          const currentPageNum = typeof historyData.pageNum === 'object' ? 
+            historyData.pageNum?.value || page_num : historyData.pageNum || page_num;
+          const itemsPerPage = typeof historyData.pageSize === 'object' ? 
+            historyData.pageSize?.value || page_size : historyData.pageSize || page_size;
+          const totalPages = typeof historyData.pages === 'object' ? 
+            historyData.pages?.value || 'N/A' : historyData.pages || 'N/A';
+          const totalItems = typeof historyData.total === 'object' ? 
+            historyData.total?.value || 'N/A' : historyData.total || 'N/A';
+
+          const output = [
+            `Device Historical Data Records (Device: ${device_key}, Product: ${product_key})`,
+            `===================================================================`,
+            `Pagination Info: Page ${currentPageNum} / Total ${totalPages} pages (${itemsPerPage} items per page, Total ${totalItems} items)`,
+            `-------------------------------------------------------------------`
+          ];
+
+          if (!dataEntries || dataEntries.length === 0) {
+            output.push("No historical data found for the given criteria.");
+            return {
+              content: [{ type: "text", text: output.join('\n') }]
+            };
+          }
+
+          dataEntries.forEach((entry: any, i: number) => {
+            const directionStr = entry.direction === 1 ? "Uplink" : 
+                                entry.direction === 2 ? "Downlink" : 
+                                `Unknown (${entry.direction})`;
+            
+            const sendStatusStr = entry.sendStatus === 0 ? "Not Sent" : 
+                                 entry.sendStatus === 1 ? "Sent" : 
+                                 entry.sendStatus === -1 ? "Send Failed" : 
+                                 `Unknown (${entry.sendStatus})`;
+
+            // Format timestamps
+            const createTime = formatTimestampWithTimezone(entry.createTime);
+            const sendTime = formatTimestampWithTimezone(entry.sendTime);
+            const updateTime = formatTimestampWithTimezone(entry.updateTime);
+
+            output.push(`\nRecord #${i + 1}:`);
+            output.push(`  ID: ${entry.id || 'N/A'}`);
+            output.push(`  Direction: ${directionStr}`);
+            output.push(`  Message Type: ${entry.msgType || 'N/A'}`);
+            output.push(`  Data Type: ${entry.dataType || 'N/A'}`);
+            output.push(`  Created Time: ${createTime}`);
+            output.push(`  Send Time: ${sendTime}`);
+            output.push(`  Update Time: ${updateTime}`);
+            output.push(`  Send Status: ${sendStatusStr}`);
+            output.push(`  Raw Data (Base64): ${entry.data || 'N/A'}`);
+            output.push(`  Thing Model Data (JSON): ${entry.thingModelData || entry.dmData || 'N/A'}`);
+            output.push(`  Ticket: ${entry.ticket || 'N/A'}`);
+            output.push(`  Source Type: ${entry.sourceType || 'N/A'}`);
+            output.push(`  Extended Data: ${JSON.stringify(entry.extData || {})}`);
+          });
+
+          return {
+            content: [{ type: "text", text: output.join('\n') }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // Query device event history tool
+    this.server.tool(
+      "get_device_event_history",
+      {
+        product_key: z.string().describe("Product key"),
+        device_key: z.string().describe("Device key"),
+        device_id: z.number().optional().describe("Device ID (optional, takes precedence over productKey/deviceKey)"),
+        begin_date_timp: z.number().optional().describe("Start time (timestamp in milliseconds, optional)"),
+        end_date_timp: z.number().optional().describe("End time (timestamp in milliseconds, optional)"),
+        event_type: z.string().optional().describe("Event type (Offline:0, Online:1, Reconnect:2, Information:3, Alert:4, Fault:5, Reset:6, optional)"),
+        language: z.string().optional().default('CN').describe("Language: CN/EN (default: CN)"),
+        page_num: z.number().optional().default(1).describe("Page number (default: 1)"),
+        page_size: z.number().optional().default(10).describe("Page size (default: 10)")
+      },
+      async ({ product_key, device_key, device_id, begin_date_timp, end_date_timp, event_type, language, page_num, page_size }) => {
+        try {
+          const eventHistoryData = await queryDeviceEventHistory(env, product_key, device_key, {
+            deviceId: device_id,
+            beginDateTimp: begin_date_timp,
+            endDateTimp: end_date_timp,
+            eventType: event_type,
+            language,
+            pageNum: page_num,
+            pageSize: page_size
+          });
+          
+          if (!eventHistoryData || typeof eventHistoryData !== 'object') {
+            return {
+              content: [{ type: "text", text: `Error: Unexpected response format from API: ${String(eventHistoryData)}` }]
+            };
+          }
+
+          const dataEntries = eventHistoryData.data || [];
+          
+          // Handle pagination info - support both direct values and object format
+          const currentPageNum = typeof eventHistoryData.pageNum === 'object' ? 
+            eventHistoryData.pageNum?.value || page_num : eventHistoryData.pageNum || page_num;
+          const itemsPerPage = typeof eventHistoryData.pageSize === 'object' ? 
+            eventHistoryData.pageSize?.value || page_size : eventHistoryData.pageSize || page_size;
+          const totalPages = typeof eventHistoryData.pages === 'object' ? 
+            eventHistoryData.pages?.value || 'N/A' : eventHistoryData.pages || 'N/A';
+          const totalItems = typeof eventHistoryData.total === 'object' ? 
+            eventHistoryData.total?.value || 'N/A' : eventHistoryData.total || 'N/A';
+
+          // Event type mapping
+          const eventTypeMap: { [key: string]: string } = {
+            "0": "Offline",
+            "1": "Online",
+            "2": "Reconnect",
+            "3": "Information",
+            "4": "Alert",
+            "5": "Fault",
+            "6": "Reset"
+          };
+
+          const output = [
+            `Device Historical Event Records (Device: ${device_key}, Product: ${product_key})`,
+            `===================================================================`,
+            `Pagination Info: Page ${currentPageNum} / Total ${totalPages} pages (${itemsPerPage} items per page, Total ${totalItems} items)`,
+            `-------------------------------------------------------------------`
+          ];
+
+          if (!dataEntries || dataEntries.length === 0) {
+            output.push("No historical event data found for the given criteria.");
+            return {
+              content: [{ type: "text", text: output.join('\n') }]
+            };
+          }
+
+          dataEntries.forEach((entry: any, i: number) => {
+            const evtTypeCode = entry.eventType || 'N/A';
+            const evtTypeStr = eventTypeMap[String(evtTypeCode)] || `Unknown Type (${evtTypeCode})`;
+
+            // Format occurrence time
+            const occurrenceTime = formatTimestampWithTimezone(entry.createTime);
+
+            output.push(`\nEvent #${i + 1}:`);
+            output.push(`  ID: ${entry.id || 'N/A'}`);
+            output.push(`  Event Type: ${evtTypeStr}`);
+            output.push(`  Event Code: ${entry.eventCode || 'N/A'}`);
+            output.push(`  Event Name: ${entry.eventName || 'N/A'}`);
+            output.push(`  Occurrence Time: ${occurrenceTime}`);
+            output.push(`  Output Parameters: ${entry.outputData || 'N/A'}`);
+            output.push(`  AB ID: ${entry.abId || 'N/A'}`);
+            output.push(`  Packet ID: ${entry.packetId || 'N/A'}`);
+            output.push(`  Ticket: ${entry.ticket || 'N/A'}`);
+            output.push(`  Extended Data: ${JSON.stringify(entry.extData || {})}`);
+          });
+
+          return {
+            content: [{ type: "text", text: output.join('\n') }]
           };
         } catch (error) {
           return {
