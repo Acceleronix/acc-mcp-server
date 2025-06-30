@@ -1,6 +1,6 @@
-# Acceleronix IoT MCP Server on Cloudflare
+# Acceleronix IoT MCP Server
 
-A remote MCP (Model Context Protocol) server for Acceleronix IoT platform, deployed on Cloudflare Workers with OAuth authentication. This server enables Claude to interact with your IoT devices through the Acceleronix platform APIs.
+A powerful MCP (Model Context Protocol) server for the Acceleronix IoT platform, deployed on Cloudflare Workers. This server enables Claude to seamlessly interact with your IoT devices through the comprehensive Acceleronix platform APIs, providing real-time device control, data monitoring, and historical analysis capabilities.
 
 ## Prerequisites
 
@@ -41,15 +41,29 @@ Acceleronix SaaS OpenAPIs are used for system integration, enabling product devi
 
 ### 2. Available IoT Tools
 
-This MCP server provides the following tools for interacting with your IoT devices:
+This MCP server provides comprehensive tools for interacting with your IoT devices:
 
-- **list_products** - List all products in your account
+#### Device Management
+- **list_products** - List all products in your account with detailed information
+- **list_products_detailed** - List products with comprehensive details including TSL and ThingModel
 - **list_devices** - List devices for a specific product
 - **get_device_details** - Get detailed information about a device
+
+#### Device Control & Monitoring  
 - **power_switch** - Control device power on/off
+- **read_device_shadow_data** - Read comprehensive device shadow data including properties and events
+- **read_device_properties** - Read specific device properties with simplified output
+
+#### Device Information
 - **query_device_location** - Get device location information
 - **query_device_resources** - Get device resource information
-- **health_check** - Check MCP server health
+
+#### Historical Data Analysis
+- **get_device_data_history** - Query historical device data with flexible time range and aggregation options
+- **get_device_event_history** - Query historical device events and alerts
+
+#### System Tools
+- **health_check** - Check MCP server health and API connectivity
 
 ## Develop locally
 
@@ -80,7 +94,7 @@ To explore your IoT MCP API, you can use the [MCP Inspector](https://modelcontex
 ### For Remote Server:
 - Use your deployed URL: `https://your-worker-name.your-account.workers.dev/sse`
 - Complete the OAuth flow when prompted
-- Test tools like `health_check`, `list_products`, `list_devices`, etc.
+- Test tools like `health_check`, `list_products`, `read_device_shadow_data`, etc.
 
 <div align="center">
   <img src="img/mcp-inspector-sse-config.png" alt="MCP Inspector with the above config" width="600"/>
@@ -133,14 +147,30 @@ Replace `your-worker-name.your-account.workers.dev` with your actual Cloudflare 
 ### Using Claude with IoT Devices
 
 Once connected, you can ask Claude to:
+
+#### Basic Device Management
 - "List my IoT products"
 - "Show me devices for product ABC123"
 - "Get details for device XYZ789"
-- "Turn on device XYZ789"
-- "Get location of device XYZ789"
 - "Check the health of my IoT connection"
 
-Claude will use the appropriate MCP tools to interact with your Acceleronix IoT platform.
+#### Device Control & Monitoring
+- "Turn on device XYZ789"
+- "Read the current status of device XYZ789"
+- "Get the temperature reading from device XYZ789"
+- "Read all properties for device XYZ789"
+
+#### Location & Resources
+- "Get location of device XYZ789"
+- "Show me the resources available on device XYZ789"
+
+#### Historical Data Analysis
+- "Show me the last 24 hours of data for device XYZ789"
+- "Get the temperature history for device XYZ789 over the past week"
+- "Show me all events from device XYZ789 in the last month"
+- "Get hourly aggregated data for device XYZ789"
+
+Claude will intelligently use the appropriate MCP tools to interact with your Acceleronix IoT platform and provide comprehensive insights about your devices.
 
 <div align="center">
   <img src="img/available_mcp_tools.png" alt="Clicking on the hammer icon shows a list of available tools" width="500"/>
