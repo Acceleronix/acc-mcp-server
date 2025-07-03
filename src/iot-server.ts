@@ -584,13 +584,16 @@ Data Source Description:
         product_key: z.string().optional().describe("Product key (required if device_id is not provided)"),
         device_key: z.string().optional().describe("Device key (required if device_id is not provided)"),
         device_id: z.number().optional().describe("Device ID (takes precedence over product_key/device_key)"),
-        language: z.string().optional().default('CN').describe("Language setting CN/EN (default: CN)")
+        language: z.string().optional().default('CN').describe("Language setting CN/EN (default: CN)"),
+        include_raw_data: z.boolean().optional().default(false).describe("Include raw JSON data in response (default: false)")
       },
-      async ({ product_key, device_key, device_id, language }) => {
+      async ({ product_key, device_key, device_id, language, include_raw_data }) => {
         try {
           const locationData = await queryDeviceLocation(env, product_key, device_key, device_id, language);
           
           const formattedInfo = [
+            "📍 Device Location Information",
+            "=" .repeat(40),
             `Device Key: ${locationData.deviceKey || 'N/A'}`,
             `Product Key: ${locationData.productKey || 'N/A'}`,
             `Location Time: ${locationData.formattedLocateTime || 'N/A'}`,
@@ -598,13 +601,21 @@ Data Source Description:
           ];
 
           if (locationData.wgsLat && locationData.wgsLng) {
-            formattedInfo.push(`WGS84 Coordinates: ${locationData.wgsLat}, ${locationData.wgsLng}`);
+            formattedInfo.push(`🌍 WGS84 Coordinates: ${locationData.wgsLat}, ${locationData.wgsLng}`);
+            formattedInfo.push(`🗺️  Map Link: https://www.google.com/maps?q=${locationData.wgsLat},${locationData.wgsLng}`);
           }
           if (locationData.gcjLat && locationData.gcjLng) {
-            formattedInfo.push(`GCJ02 Coordinates: ${locationData.gcjLat}, ${locationData.gcjLng}`);
+            formattedInfo.push(`🇨🇳 GCJ02 Coordinates: ${locationData.gcjLat}, ${locationData.gcjLng}`);
           }
           if (locationData.accuracy) {
-            formattedInfo.push(`Accuracy: ${locationData.accuracy}`);
+            formattedInfo.push(`📏 Accuracy: ${locationData.accuracy}m`);
+          }
+
+          if (include_raw_data) {
+            formattedInfo.push("");
+            formattedInfo.push("📋 Raw API Response:");
+            formattedInfo.push("=" .repeat(20));
+            formattedInfo.push(JSON.stringify(locationData, null, 2));
           }
 
           return {
@@ -618,7 +629,8 @@ Data Source Description:
       }
     );
 
-    // Get device location raw tool
+    // Get device location raw tool (DEPRECATED - use query_device_location instead to avoid redundant calls)
+    /*
     this.server.tool(
       "get_device_location_raw",
       {
@@ -640,6 +652,7 @@ Data Source Description:
         }
       }
     );
+    */
 
     // Query device resources tool
     this.server.tool(
