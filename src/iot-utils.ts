@@ -7,6 +7,36 @@ export interface IoTEnvironment {
   ACCESS_SECRET: string;
 }
 
+// Pagination cursor interface
+export interface PaginationCursor {
+  pageNo: number;
+  pageSize: number;
+  productKey?: string;
+  totalItems?: number;
+}
+
+// Pagination response interface
+export interface PaginatedResponse<T> {
+  data: T[];
+  nextCursor?: string;
+}
+
+// Encode cursor to base64 string
+export function encodeCursor(cursor: PaginationCursor): string {
+  const cursorStr = JSON.stringify(cursor);
+  return btoa(cursorStr);
+}
+
+// Decode cursor from base64 string
+export function decodeCursor(cursor: string): PaginationCursor {
+  try {
+    const cursorStr = atob(cursor);
+    return JSON.parse(cursorStr);
+  } catch (error) {
+    throw new Error('Invalid cursor format');
+  }
+}
+
 // Global token cache
 let accessToken: string | null = null;
 let tokenExpiry: number = 0;
@@ -148,6 +178,86 @@ export async function listProducts(env: IoTEnvironment, pageSize: number = 100):
   return allProducts;
 }
 
+// Paginated version of listProducts
+export async function listProductsPaginated(
+  env: IoTEnvironment, 
+  cursor?: string, 
+  defaultPageSize: number = 15
+): Promise<PaginatedResponse<any>> {
+  let pageNo = 1;
+  let pageSize = defaultPageSize;
+  
+  // Decode cursor if provided
+  if (cursor) {
+    try {
+      const decodedCursor = decodeCursor(cursor);
+      pageNo = decodedCursor.pageNo;
+      pageSize = decodedCursor.pageSize;
+    } catch (error) {
+      throw new Error('Invalid cursor provided');
+    }
+  }
+  
+  const url = `${env.BASE_URL}/v2/quecproductmgr/r3/openapi/products?pageSize=${pageSize}&pageNo=${pageNo}`;
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    
+    if (content.code !== 200) {
+      throw new Error(content.msg || 'Unknown error');
+    }
+    
+    const products = content.data || [];
+    let nextCursor: string | undefined;
+    
+    // Check if there are more pages by looking at the data length
+    if (products.length === pageSize) {
+      // Try to get next page to see if it exists
+      const nextPageUrl = `${env.BASE_URL}/v2/quecproductmgr/r3/openapi/products?pageSize=${pageSize}&pageNo=${pageNo + 1}`;
+      try {
+        const nextResponse = await fetch(nextPageUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": token
+          }
+        });
+        
+        if (nextResponse.ok) {
+          const nextContent = await nextResponse.json() as any;
+          if (nextContent.code === 200 && nextContent.data && nextContent.data.length > 0) {
+            nextCursor = encodeCursor({
+              pageNo: pageNo + 1,
+              pageSize: pageSize
+            });
+          }
+        }
+      } catch (error) {
+        // Ignore errors when checking next page
+      }
+    }
+    
+    return {
+      data: products,
+      nextCursor
+    };
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to get paginated products list');
+  }
+}
+
 export async function getProductTslJson(env: IoTEnvironment, productKey: string): Promise<any> {
   const url = `${env.BASE_URL}/v2/quectsl/openapi/product/export/tslFile?productKey=${productKey}`;
   
@@ -266,6 +376,87 @@ export async function listDevices(env: IoTEnvironment, productKey: string, pageS
   }
   
   return allDevices;
+}
+
+// Paginated version of listDevices
+export async function listDevicesPaginated(
+  env: IoTEnvironment, 
+  productKey: string,
+  cursor?: string, 
+  defaultPageSize: number = 15
+): Promise<PaginatedResponse<any>> {
+  let pageNo = 1;
+  let pageSize = defaultPageSize;
+  
+  // Decode cursor if provided
+  if (cursor) {
+    try {
+      const decodedCursor = decodeCursor(cursor);
+      pageNo = decodedCursor.pageNo;
+      pageSize = decodedCursor.pageSize;
+      // Validate productKey matches cursor
+      if (decodedCursor.productKey && decodedCursor.productKey !== productKey) {
+        throw new Error('Product key mismatch with cursor');
+      }
+    } catch (error) {
+      throw new Error('Invalid cursor provided');
+    }
+  }
+  
+  const url = `${env.BASE_URL}/v2/devicemgr/r3/openapi/product/device/overview?productKey=${productKey}&pageSize=${pageSize}&pageNo=${pageNo}`;
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    const devices = content.data || [];
+    let nextCursor: string | undefined;
+    
+    // Check if there are more pages by looking at the data length
+    if (devices.length === pageSize) {
+      // Try to get next page to see if it exists
+      const nextPageUrl = `${env.BASE_URL}/v2/devicemgr/r3/openapi/product/device/overview?productKey=${productKey}&pageSize=${pageSize}&pageNo=${pageNo + 1}`;
+      try {
+        const nextResponse = await fetch(nextPageUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": token
+          }
+        });
+        
+        if (nextResponse.ok) {
+          const nextContent = await nextResponse.json() as any;
+          if (nextContent.data && nextContent.data.length > 0) {
+            nextCursor = encodeCursor({
+              pageNo: pageNo + 1,
+              pageSize: pageSize,
+              productKey: productKey
+            });
+          }
+        }
+      } catch (error) {
+        // Ignore errors when checking next page
+      }
+    }
+    
+    return {
+      data: devices,
+      nextCursor
+    };
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to get paginated devices list');
+  }
 }
 
 export async function getDeviceDetail(env: IoTEnvironment, productKey: string, deviceKey: string): Promise<any> {

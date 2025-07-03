@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   IoTEnvironment,
   listProducts,
+  listProductsPaginated,
+  listDevicesPaginated,
   getProductTslJson,
   getProductThingModel,
   listDevices,
@@ -20,7 +22,8 @@ import {
   formatNetworkWay,
   formatDataFmt,
   formatAuthMode,
-  getAccessToken
+  getAccessToken,
+  PaginatedResponse
 } from "./iot-utils";
 
 export class IoTMCP extends McpAgent {
@@ -43,7 +46,8 @@ export class IoTMCP extends McpAgent {
       throw new Error('Missing required IoT API environment variables');
     }
 
-    // List products tool
+    // List products tool (DEPRECATED - use list_products_paginated instead to avoid token limits)
+    /*
     this.server.tool(
       "list_products",
       {
@@ -88,6 +92,7 @@ ${i + 1}. ${product.productName || 'Unknown'}
         }
       }
     );
+    */
 
     // List products detailed tool
     this.server.tool(
@@ -127,6 +132,121 @@ ${i + 1}. ${product.productName || 'Unknown'}
 
           return {
             content: [{ type: "text", text: productList.join("\n") }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // List products paginated tool
+    this.server.tool(
+      "list_products_paginated",
+      {
+        cursor: z.string().optional().describe("Pagination cursor for next page (optional)")
+      },
+      async ({ cursor }) => {
+        try {
+          const result: PaginatedResponse<any> = await listProductsPaginated(env, cursor, 15);
+          
+          if (!result.data || result.data.length === 0) {
+            return {
+              content: [{ type: "text", text: "No products found in your account." }]
+            };
+          }
+
+          const productList = [`Product list (page results: ${result.data.length} products):`, "=" .repeat(60)];
+          
+          result.data.forEach((product, i) => {
+            const createTime = formatTimestampWithTimezone(product.createTime);
+            const updateTime = formatTimestampWithTimezone(product.updateTime);
+            
+            const productInfo = `
+${i + 1}. ${product.productName || 'Unknown'}
+   Product Key: ${product.productKey || 'N/A'}
+   Access Type: ${formatAccessType(product.accessType)} (${product.accessType})
+   Network Way: ${formatNetworkWay(product.netWay)} (${product.netWay})
+   Data Format: ${formatDataFmt(product.dataFmt)} (${product.dataFmt})
+   Connect Platform: ${product.connectPlatform || 'N/A'}
+   Created Time: ${createTime}
+   Updated Time: ${updateTime}`;
+            
+            productList.push(productInfo);
+          });
+
+          if (result.nextCursor) {
+            productList.push("");
+            productList.push(`📄 More products available. Use cursor: ${result.nextCursor}`);
+            productList.push("Call this tool again with the cursor parameter to get the next page.");
+          } else {
+            productList.push("");
+            productList.push("✅ End of product list.");
+          }
+
+          return {
+            content: [{ type: "text", text: productList.join("\n") }],
+            ...(result.nextCursor ? { nextCursor: result.nextCursor } : {})
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // List devices paginated tool
+    this.server.tool(
+      "list_devices_paginated",
+      {
+        product_key: z.string().describe("Product key to list devices for"),
+        cursor: z.string().optional().describe("Pagination cursor for next page (optional)")
+      },
+      async ({ product_key, cursor }) => {
+        try {
+          const result: PaginatedResponse<any> = await listDevicesPaginated(env, product_key, cursor, 15);
+          
+          if (!result.data || result.data.length === 0) {
+            return {
+              content: [{ type: "text", text: `No devices found for product key: ${product_key}` }]
+            };
+          }
+
+          const deviceList = [`Device list for product ${product_key} (page results: ${result.data.length} devices):`, "=" .repeat(60)];
+          
+          result.data.forEach((device, i) => {
+            const deviceInfo = `
+${i + 1}. ${device.deviceName || 'Unknown'}
+   Device Key: ${device.deviceKey || 'N/A'}
+   Product Key: ${device.productKey || 'N/A'}
+   Serial Number: ${device.sn || 'N/A'}
+   Status: ${device.deviceStatus === 1 ? 'Online' : 'Offline'} (${device.deviceStatus})
+   Activated: ${device.isActived === 1 ? '✓' : '✗'} (${device.isActived})
+   Virtual Device: ${device.isVirtual === 1 ? 'Yes' : 'No'} (${device.isVirtual})
+   Verification Status: ${device.isVerified === 1 ? 'Verified' : 'Not Verified'} (${device.isVerified})
+   Auth Mode: ${formatAuthMode(device.authMode)} (${device.authMode})
+   Data Format: ${formatDataFmt(device.dataFmt)} (${device.dataFmt})
+   Created Time: ${formatTimestampWithTimezone(device.createTime)}
+   Activated Time: ${formatTimestampWithTimezone(device.activedTime)}
+   Last Update: ${formatTimestampWithTimezone(device.updateTime)}`;
+            
+            deviceList.push(deviceInfo);
+          });
+
+          if (result.nextCursor) {
+            deviceList.push("");
+            deviceList.push(`📄 More devices available. Use cursor: ${result.nextCursor}`);
+            deviceList.push("Call this tool again with the cursor parameter to get the next page.");
+          } else {
+            deviceList.push("");
+            deviceList.push("✅ End of device list.");
+          }
+
+          return {
+            content: [{ type: "text", text: deviceList.join("\n") }],
+            ...(result.nextCursor ? { nextCursor: result.nextCursor } : {})
           };
         } catch (error) {
           return {
@@ -178,7 +298,8 @@ ${i + 1}. ${product.productName || 'Unknown'}
       }
     );
 
-    // List devices tool
+    // List devices tool (DEPRECATED - use list_devices_paginated instead to avoid token limits)
+    /*
     this.server.tool(
       "list_devices",
       {
@@ -197,8 +318,10 @@ ${i + 1}. ${product.productName || 'Unknown'}
         }
       }
     );
+    */
 
-    // List devices formatted tool
+    // List devices formatted tool (DEPRECATED - use list_devices_paginated instead to avoid token limits)
+    /*
     this.server.tool(
       "list_devices_formatted",
       {
@@ -245,6 +368,7 @@ ${i + 1}. ${device.deviceName || 'Unknown'}
         }
       }
     );
+    */
 
     // Get device details tool
     this.server.tool(
