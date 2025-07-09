@@ -580,11 +580,11 @@ Data Source Description:
 
     // Fan mode control tool (FAN_MODE control based on TSL model)
     this.server.tool(
-      "fan_mode",
+      "set_fan_mode",
       {
         product_key: z.string().describe("Product key identifying the product"),
         device_key: z.string().describe("Device key identifying the specific device"),
-        mode: z.string().describe('Fan speed mode: "low" or "1" (Low speed), "medium" or "2" (Medium speed), "high" or "3" (High speed) - Based on TSL model FAN_MODE property')
+        mode: z.string().describe('CONTROL ACTION: Set fan speed mode to "low" or "1" (Low speed), "medium" or "2" (Medium speed), "high" or "3" (High speed) - This is a device control command, not a data visualization tool')
       },
       async ({ product_key, device_key, mode }) => {
         try {
