@@ -500,10 +500,12 @@ export async function getDeviceDetail(env: IoTEnvironment, productKey: string, d
 
 export async function powerSwitch(env: IoTEnvironment, productKey: string, deviceKey: string, onOff: string): Promise<string> {
   const url = `${env.BASE_URL}/v2/deviceshadow/r3/openapi/dm/writeData`;
+  
+  // Map on/off to TSL model Open/Close values
   const switchState = onOff.toLowerCase() === 'on' ? 'true' : 'false';
   
   const requestBody = {
-    data: `[{"switch":"${switchState}"}]`,
+    data: `[{"FAN_SWITCH":"${switchState}"}]`,
     devices: [deviceKey],
     productKey: productKey
   };
@@ -526,7 +528,8 @@ export async function powerSwitch(env: IoTEnvironment, productKey: string, devic
     const content = await response.json() as any;
     
     if (content.code === 200 && content.data?.[0]?.code === 200) {
-      return "Success";
+      const action = onOff.toLowerCase() === 'on' ? 'Open' : 'Close';
+      return `Success: FAN_SWITCH set to ${action} (${switchState})`;
     } else {
       throw new Error(content.msg || 'Unknown error');
     }

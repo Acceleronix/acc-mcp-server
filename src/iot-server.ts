@@ -555,13 +555,13 @@ Data Source Description:
       }
     );
 
-    // Power switch tool
+    // Power switch tool (FAN_SWITCH control based on TSL model)
     this.server.tool(
       "power_switch",
       {
         product_key: z.string().describe("Product key identifying the product"),
         device_key: z.string().describe("Device key identifying the specific device"),
-        on_off: z.string().describe('"on" to turn on, "off" to turn off')
+        on_off: z.string().describe('"on" to turn on (Open), "off" to turn off (Close) - Based on TSL model FAN_SWITCH property')
       },
       async ({ product_key, device_key, on_off }) => {
         try {
