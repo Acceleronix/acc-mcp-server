@@ -539,6 +539,62 @@ export async function powerSwitch(env: IoTEnvironment, productKey: string, devic
   }
 }
 
+export async function fanMode(env: IoTEnvironment, productKey: string, deviceKey: string, mode: string): Promise<string> {
+  const url = `${env.BASE_URL}/v2/deviceshadow/r3/openapi/dm/writeData`;
+  
+  // Map mode names to TSL model values
+  const modeMapping: { [key: string]: string } = {
+    'low': '1',
+    'medium': '2',
+    'high': '3',
+    '1': '1',
+    '2': '2',
+    '3': '3'
+  };
+  
+  const normalizedMode = mode.toLowerCase().trim();
+  const modeValue = modeMapping[normalizedMode];
+  
+  if (!modeValue) {
+    throw new Error(`Invalid fan mode: ${mode}. Valid modes are: low, medium, high (or 1, 2, 3)`);
+  }
+  
+  const requestBody = {
+    data: `[{"FAN_MODE":"${modeValue}"}]`,
+    devices: [deviceKey],
+    productKey: productKey
+  };
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    
+    if (content.code === 200 && content.data?.[0]?.code === 200) {
+      const modeNames = { '1': 'Low speed', '2': 'Medium speed', '3': 'High speed' };
+      const modeName = modeNames[modeValue as keyof typeof modeNames];
+      return `Success: FAN_MODE set to ${modeName} (${modeValue})`;
+    } else {
+      throw new Error(content.msg || 'Unknown error');
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to control fan mode');
+  }
+}
+
 export async function queryDeviceLocation(
   env: IoTEnvironment,
   productKey?: string,

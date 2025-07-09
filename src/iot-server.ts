@@ -12,6 +12,7 @@ import {
   listDevices,
   getDeviceDetail,
   powerSwitch,
+  fanMode,
   queryDeviceLocation,
   queryDeviceResources,
   readDeviceData,
@@ -566,6 +567,28 @@ Data Source Description:
       async ({ product_key, device_key, on_off }) => {
         try {
           const result = await powerSwitch(env, product_key, device_key, on_off);
+          return {
+            content: [{ type: "text", text: result }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // Fan mode control tool (FAN_MODE control based on TSL model)
+    this.server.tool(
+      "fan_mode",
+      {
+        product_key: z.string().describe("Product key identifying the product"),
+        device_key: z.string().describe("Device key identifying the specific device"),
+        mode: z.string().describe('Fan speed mode: "low" or "1" (Low speed), "medium" or "2" (Medium speed), "high" or "3" (High speed) - Based on TSL model FAN_MODE property')
+      },
+      async ({ product_key, device_key, mode }) => {
+        try {
+          const result = await fanMode(env, product_key, device_key, mode);
           return {
             content: [{ type: "text", text: result }]
           };
