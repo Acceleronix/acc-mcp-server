@@ -22,10 +22,4 @@ enabled = true
 # Migrations
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["MyMCP"]
-
-[[migrations]]
-tag = "v2"
-renamed_classes = [
-  { from = "MyMCP", to = "IoTMCP" }
-]
+new_sqlite_classes = ["IoTMCP"]
