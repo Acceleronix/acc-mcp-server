@@ -498,7 +498,7 @@ export async function getDeviceDetail(env: IoTEnvironment, productKey: string, d
   }
 }
 
-export async function powerSwitch(env: IoTEnvironment, productKey: string, deviceKey: string, onOff: string): Promise<string> {
+export async function fan_switch(env: IoTEnvironment, productKey: string, deviceKey: string, onOff: string): Promise<string> {
   const url = `${env.BASE_URL}/v2/deviceshadow/r3/openapi/dm/writeData`;
   
   // Map on/off to TSL model Open/Close values
@@ -535,7 +535,48 @@ export async function powerSwitch(env: IoTEnvironment, productKey: string, devic
     }
   } catch (error) {
     console.error('API Error:', error);
-    throw new Error('Failed to control device power');
+    throw new Error('Failed to control fan switch');
+  }
+}
+
+export async function buzzerSwitch(env: IoTEnvironment, productKey: string, deviceKey: string, onOff: string): Promise<string> {
+  const url = `${env.BASE_URL}/v2/deviceshadow/r3/openapi/dm/writeData`;
+  
+  // Map on/off to TSL model Open/Close values for buzzer
+  const switchState = onOff.toLowerCase() === 'on' ? 'true' : 'false';
+  
+  const requestBody = {
+    data: `[{"BUZZER_SWITCH":"${switchState}"}]`,
+    devices: [deviceKey],
+    productKey: productKey
+  };
+  
+  try {
+    const token = await getAccessToken(env);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.json() as any;
+    
+    if (content.code === 200 && content.data?.[0]?.code === 200) {
+      const action = onOff.toLowerCase() === 'on' ? 'Open' : 'Close';
+      return `Success: BUZZER_SWITCH set to ${action} (${switchState})`;
+    } else {
+      throw new Error(content.msg || 'Unknown error');
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw new Error('Failed to control buzzer');
   }
 }
 

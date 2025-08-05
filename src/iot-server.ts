@@ -11,7 +11,8 @@ import {
   getProductThingModel,
   listDevices,
   getDeviceDetail,
-  powerSwitch,
+  fan_switch,
+  buzzerSwitch,
   fanMode,
   queryDeviceLocation,
   queryDeviceResources,
@@ -556,17 +557,17 @@ Data Source Description:
       }
     );
 
-    // Power switch tool (FAN_SWITCH control based on TSL model)
+    // Fan switch tool (FAN_SWITCH control based on TSL model)
     this.server.tool(
-      "power_switch",
+      "fan_switch",
       {
         product_key: z.string().describe("Product key identifying the product"),
         device_key: z.string().describe("Device key identifying the specific device"),
-        on_off: z.string().describe('"on" to turn on (Open), "off" to turn off (Close) - Based on TSL model FAN_SWITCH property')
+        on_off: z.string().describe('"on" to turn on fan (Open), "off" to turn off fan (Close) - Based on TSL model FAN_SWITCH property')
       },
       async ({ product_key, device_key, on_off }) => {
         try {
-          const result = await powerSwitch(env, product_key, device_key, on_off);
+          const result = await fan_switch(env, product_key, device_key, on_off);
           return {
             content: [{ type: "text", text: result }]
           };
@@ -589,6 +590,28 @@ Data Source Description:
       async ({ product_key, device_key, mode }) => {
         try {
           const result = await fanMode(env, product_key, device_key, mode);
+          return {
+            content: [{ type: "text", text: result }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+          };
+        }
+      }
+    );
+
+    // Buzzer switch tool (BUZZER_SWITCH control based on TSL model)
+    this.server.tool(
+      "buzzer_switch",
+      {
+        product_key: z.string().describe("Product key identifying the product"),
+        device_key: z.string().describe("Device key identifying the specific device"),
+        on_off: z.string().describe('"on" to turn on buzzer (Open), "off" to turn off buzzer (Close) - Based on TSL model BUZZER_SWITCH property')
+      },
+      async ({ product_key, device_key, on_off }) => {
+        try {
+          const result = await buzzerSwitch(env, product_key, device_key, on_off);
           return {
             content: [{ type: "text", text: result }]
           };
