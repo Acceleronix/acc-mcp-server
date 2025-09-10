@@ -9,7 +9,7 @@ A powerful MCP (Model Context Protocol) server for the Acceleronix IoT platform,
 Before you can use this MCP server, you need to obtain API credentials from the Acceleronix IoT platform:
 
 #### Step 1: Sign up and Access Developer Center
-1. **Sign up for Acceleronix Platform**: Visit [Acceleronix Developer Platform](https://iot-api.acceleronix.io) and create an account
+1. **Sign up for Acceleronix Platform**: Visit [Acceleronix Developer Center](https://core.acceleronix.io) and create an account
 2. **Access Developer Center**: Log into your Acceleronix developer dashboard
 
 #### Step 2: Create SaaS Application
